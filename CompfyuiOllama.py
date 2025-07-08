@@ -97,7 +97,8 @@ request query params:
 
 """)
 
-        response = client.generate(model=model, prompt=query, images=images_binary, keep_alive=str(keep_alive) + "m", format=format)
+        response = client.generate(model=model, prompt=query, images=images_binary, keep_alive=str(
+            keep_alive) + "m", format=format)
 
         if debug == "enable":
             print("[Ollama Vision]\nResponse:\n")
@@ -151,7 +152,8 @@ request query params:
 
             """)
 
-        response = client.generate(model=model, prompt=prompt, keep_alive=str(keep_alive) + "m", format=format)
+        response = client.generate(
+            model=model, prompt=prompt, keep_alive=str(keep_alive) + "m", format=format)
 
         if debug == "enable":
             print("[Ollama Generate]\nResponse:\n")
@@ -161,6 +163,140 @@ request query params:
 
 
 # https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-completion
+
+class OllamaGenerateAdvanceIsChinese:
+    saved_context = None
+
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        seed = random.randint(1, 2 ** 31)
+        return {
+            "required": {
+                "prompt": ("STRING", {
+                    "multiline": True,
+                    "default": "What is Art?"
+                }),
+                "debug": ("BOOLEAN", {"default": False}),
+                "url": ("STRING", {
+                    "multiline": False,
+                    "default": "http://127.0.0.1:11434"
+                }),
+                "model": ((), {}),
+                "system": ("STRING", {
+                    "multiline": True,
+                    "default": "You are an art expert, gracefully describing your knowledge in art domain.",
+                    "title": "system"
+                }),
+                "seed": ("INT", {"default": seed, "min": 0, "max": 2 ** 31, "step": 1}),
+                "top_k": ("INT", {"default": 40, "min": 0, "max": 100, "step": 1}),
+                "top_p": ("FLOAT", {"default": 0.9, "min": 0, "max": 1, "step": 0.05}),
+                "temperature": ("FLOAT", {"default": 0.8, "min": 0, "max": 1, "step": 0.05}),
+                "num_predict": ("INT", {"default": -1, "min": -2, "max": 2048, "step": 1}),
+                "tfs_z": ("FLOAT", {"default": 1, "min": 1, "max": 1000, "step": 0.05}),
+                "keep_alive": ("INT", {"default": 5, "min": -1, "max": 60, "step": 1}),
+                "keep_context": ("BOOLEAN", {"default": False}),
+                "format": (["text", "json", ''],),
+            }, "optional": {
+                "context": ("STRING", {"forceInput": True}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("response",)
+    FUNCTION = "ollama_generate_advance"
+    CATEGORY = "Ollama"
+    
+    def is_chinese(self, text, threshold=0.5):
+        # 匹配中文字符
+        chinese_pattern = re.compile(r'[\u4e00-\u9fff]')
+        # 匹配英文字符
+        english_pattern = re.compile(r'[a-zA-Z]')
+        
+        # 计算中文字符的数量
+        chinese_count = len(chinese_pattern.findall(text))
+        # 计算英文字符的数量
+        english_count = len(english_pattern.findall(text))
+        
+        # 计算总字符数
+        total_count = chinese_count + english_count
+        
+        # 如果总字符数为0，返回False（避免除以0的情况）
+        if total_count == 0:
+            return False
+        
+        # 计算中文字符的比例
+        chinese_ratio = chinese_count / total_count
+        
+        # 根据比例判断字符串是否为中文
+        return chinese_ratio >= threshold
+
+    def ollama_generate_advance(self, prompt, debug, url, model, system, seed, top_k, top_p, temperature, num_predict,
+                                tfs_z, keep_alive, keep_context, format, context=None):
+        if not self.is_chinese(prompt):
+            return (prompt,)
+        
+        client = Client(host=url)
+
+        if format == "text":
+            format = ''
+
+        # num_keep: int
+        # seed: int
+        # num_predict: int
+        # top_k: int
+        # top_p: float
+        # tfs_z: float
+        # typical_p: float
+        # repeat_last_n: int
+        # temperature: float
+        # repeat_penalty: float
+        # presence_penalty: float
+        # frequency_penalty: float
+        # mirostat: int
+        # mirostat_tau: float
+        # mirostat_eta: float
+        # penalize_newline: bool
+        # stop: Sequence[str]
+
+        options = {
+            "seed": seed,
+            "top_k": top_k,
+            "top_p": top_p,
+            "temperature": temperature,
+            "num_predict": num_predict,
+            "tfs_z": tfs_z,
+        }
+
+        if context != None and isinstance(context, str):
+            string_list = context.split(',')
+            context = [int(item.strip()) for item in string_list]
+
+        if keep_context and context == None:
+            context = self.saved_context
+
+        if debug:
+            print(f"""[Ollama Generate Advance]
+request query params:
+
+- prompt: {prompt}
+- url: {url}
+- model: {model}
+- options: {options}
+""")
+
+        response = client.generate(model=model, system=system, prompt=prompt, context=context, options=options,
+                                   keep_alive=str(keep_alive) + "m", format=format)
+        if debug:
+            print("[Ollama Generate Advance]\nResponse:\n")
+            pprint(response)
+
+        if keep_context:
+            self.saved_context = response["context"]
+
+        return (response['response'],)
 
 class OllamaGenerateAdvance:
     saved_context = None
@@ -273,13 +409,14 @@ request query params:
 
 class OllamaSaveContext:
     def __init__(self):
-        self._base_dir = os.path.dirname(os.path.realpath(__file__)) + os.path.sep + "saved_context"
+        self._base_dir = os.path.dirname(os.path.realpath(
+            __file__)) + os.path.sep + "saved_context"
 
     @classmethod
     def INPUT_TYPES(s):
         return {"required":
-                    {"context": ("STRING", {"forceInput": True},),
-                     "filename": ("STRING", {"default": "context"})},
+                {"context": ("STRING", {"forceInput": True},),
+                 "filename": ("STRING", {"default": "context"})},
                 }
 
     RETURN_TYPES = ()
@@ -294,7 +431,8 @@ class OllamaSaveContext:
 
         metadata.add_text("context", ','.join(map(str, context)))
 
-        image = Image.new('RGB', (100, 100), (255, 255, 255))  # Creates a 100x100 white image
+        image = Image.new('RGB', (100, 100), (255, 255, 255)
+                          )  # Creates a 100x100 white image
 
         image.save(path + ".png", pnginfo=metadata)
 
@@ -303,14 +441,17 @@ class OllamaSaveContext:
 
 class OllamaLoadContext:
     def __init__(self):
-        self._base_dir = os.path.dirname(os.path.realpath(__file__)) + os.path.sep + "saved_context"
+        self._base_dir = os.path.dirname(os.path.realpath(
+            __file__)) + os.path.sep + "saved_context"
 
     @classmethod
     def INPUT_TYPES(s):
-        input_dir = os.path.dirname(os.path.realpath(__file__)) + os.path.sep + "saved_context"
-        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f)) and f != ".keep"]
+        input_dir = os.path.dirname(os.path.realpath(
+            __file__)) + os.path.sep + "saved_context"
+        files = [f for f in os.listdir(input_dir) if os.path.isfile(
+            os.path.join(input_dir, f)) and f != ".keep"]
         return {"required":
-                    {"context_file": (files, {})},
+                {"context_file": (files, {})},
                 }
 
     CATEGORY = "Ollama"
@@ -336,7 +477,7 @@ class OllamaOptionsV2:
         return {
             "required": {
                 "enable_mirostat": ("BOOLEAN", {"default": False}),
-                "mirostat": ("INT", {"default": 0, "min": 0, "max":2, "step": 1}),
+                "mirostat": ("INT", {"default": 0, "min": 0, "max": 2, "step": 1}),
 
                 "enable_mirostat_eta": ("BOOLEAN", {"default": False}),
                 "mirostat_eta": ("FLOAT", {"default": 0.1, "min": 0, "step": 0.1}),
@@ -360,7 +501,7 @@ class OllamaOptionsV2:
                 "seed": ("INT", {"default": seed, "min": 0, "max": 2 ** 31, "step": 1}),
 
                 "enable_stop": ("BOOLEAN", {"default": False}),
-                "stop": ("STRING", {"default": "", "multiline": False,}),
+                "stop": ("STRING", {"default": "", "multiline": False, }),
 
                 "enable_tfs_z": ("BOOLEAN", {"default": False}),
                 "tfs_z": ("FLOAT", {"default": 1, "min": 1, "max": 1000, "step": 0.05}),
@@ -377,7 +518,8 @@ class OllamaOptionsV2:
                 "enable_min_p": ("BOOLEAN", {"default": False}),
                 "min_p": ("FLOAT", {"default": 0.0, "min": 0, "max": 1, "step": 0.05}),
 
-                "debug": ("BOOLEAN", {"default": False}), # this is for nodes code usage only, not ollama api.
+                # this is for nodes code usage only, not ollama api.
+                "debug": ("BOOLEAN", {"default": False}),
             },
         }
 
@@ -394,6 +536,7 @@ class OllamaOptionsV2:
             print("---------------------------------------------------------")
 
         return (kargs,)
+
 
 class OllamaConnectivityV2:
     def __init__(self):
@@ -484,18 +627,19 @@ class OllamaGenerateV2:
 
         return response
 
-    def ollama_generate_v2(self, system, prompt, format, keep_context, context = None, options=None, connectivity=None, images=None, meta=None):
+    def ollama_generate_v2(self, system, prompt, format, keep_context, context=None, options=None, connectivity=None, images=None, meta=None):
 
         if connectivity is None and meta is None:
             raise Exception("Required input connectivity or meta.")
 
         if connectivity is None and meta['connectivity'] is None:
-            raise Exception("Required input connectivity or connectivity in meta.")
+            raise Exception(
+                "Required input connectivity or connectivity in meta.")
 
         if meta is not None:
-            if connectivity is not None: # bypass the current meta connectivity
+            if connectivity is not None:  # bypass the current meta connectivity
                 meta["connectivity"] = connectivity
-            if options is not None: # bypass the current meta options
+            if options is not None:  # bypass the current meta options
                 meta["options"] = options
         else:
             meta = {"options": options, "connectivity": connectivity}
@@ -516,8 +660,9 @@ class OllamaGenerateV2:
         if keep_context and context is None:
             context = self.saved_context
 
-        keep_alive_unit =  'm' if meta['connectivity']['keep_alive_unit'] == "minutes" else 'h'
-        request_keep_alive = str(meta['connectivity']['keep_alive']) + keep_alive_unit
+        keep_alive_unit = 'm' if meta['connectivity']['keep_alive_unit'] == "minutes" else 'h'
+        request_keep_alive = str(
+            meta['connectivity']['keep_alive']) + keep_alive_unit
 
         request_options = self.get_request_options(options)
 
@@ -555,7 +700,7 @@ format: {format}
             images=images_b64,
             context=context,
             options=request_options,
-            keep_alive= request_keep_alive,
+            keep_alive=request_keep_alive,
             format=format,
         )
 
@@ -576,6 +721,7 @@ NODE_CLASS_MAPPINGS = {
     "OllamaVision": OllamaVision,
     "OllamaGenerate": OllamaGenerate,
     "OllamaGenerateAdvance": OllamaGenerateAdvance,
+    "OllamaGenerateAdvanceIsChinese": OllamaGenerateAdvanceIsChinese,
     "OllamaOptionsV2": OllamaOptionsV2,
     "OllamaConnectivityV2": OllamaConnectivityV2,
     "OllamaGenerateV2": OllamaGenerateV2,
@@ -587,6 +733,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "OllamaVision": "Ollama Vision",
     "OllamaGenerate": "Ollama Generate",
     "OllamaGenerateAdvance": "Ollama Generate Advance",
+    "OllamaGenerateAdvanceIsChinese": "Ollama Generate Advance If Chinese",
     "OllamaOptionsV2": "Ollama Options V2",
     "OllamaConnectivityV2": "Ollama Connectivity V2",
     "OllamaGenerateV2": "Ollama Generate V2",
