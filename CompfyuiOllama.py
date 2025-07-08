@@ -210,6 +210,7 @@ class OllamaGenerateAdvanceIsChinese:
     CATEGORY = "Ollama"
     
     def is_chinese(self, text, threshold=0.5):
+        import re
         # 匹配中文字符
         chinese_pattern = re.compile(r'[\u4e00-\u9fff]')
         # 匹配英文字符
