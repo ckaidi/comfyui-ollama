@@ -1,9 +1,6 @@
 import random
+import re
 
-import json
-from typing import Optional
-
-from httpx import request
 from ollama import Client
 import numpy as np
 import base64
@@ -478,49 +475,48 @@ class OllamaOptionsV2:
         return {
             "required": {
                 "enable_mirostat": ("BOOLEAN", {"default": False}),
-                "mirostat": ("INT", {"default": 0, "min": 0, "max": 2, "step": 1}),
+                "mirostat": ("INT", {"default": 0, "min": 0, "max":2, "step": 1, "tooltip": "Whether to use Mirostat sampling. Mirostat is an algorithm that actively maintains the quality of generated text within a desired range during text generation. (0 = disabled, 1 = Mirostat 1, 2 = Mirostat 2.0)"}),
 
                 "enable_mirostat_eta": ("BOOLEAN", {"default": False}),
-                "mirostat_eta": ("FLOAT", {"default": 0.1, "min": 0, "step": 0.1}),
+                "mirostat_eta": ("FLOAT", {"default": 0.1, "min": 0, "step": 0.1, "tooltip": "Mirostat's learning rate parameter influences how quickly the algorithm responds to feedback from the generated text."}),
 
                 "enable_mirostat_tau": ("BOOLEAN", {"default": False}),
-                "mirostat_tau": ("FLOAT", {"default": 5.0, "min": 0, "step": 0.1}),
+                "mirostat_tau": ("FLOAT", {"default": 5.0, "min": 0, "step": 0.1, "tooltip": "Mirostat's target entropy parameter controls the balance between coherence and diversity in the generated text."}),
 
                 "enable_num_ctx": ("BOOLEAN", {"default": False}),
-                "num_ctx": ("INT", {"default": 2048, "min": 0, "max": 2 ** 31, "step": 1}),
+                "num_ctx": ("INT", {"default": 2048, "min": 0, "max": 2 ** 31, "step": 1, "tooltip": "Sets the size of the context window used to generate the next token."}),
 
                 "enable_repeat_last_n": ("BOOLEAN", {"default": False}),
-                "repeat_last_n": ("INT", {"default": 64, "min": -1, "max": 64, "step": 1}),
+                "repeat_last_n": ("INT", {"default": 64, "min": -1, "max": 64, "step": 1, "tooltip": "Sets how far back for the model to look back to prevent repetition. (0 = disabled, -1 = num_ctx)"}),
 
                 "enable_repeat_penalty": ("BOOLEAN", {"default": False}),
-                "repeat_penalty": ("FLOAT", {"default": 1.1, "min": 0, "max": 2, "step": 0.05}),
+                "repeat_penalty": ("FLOAT", {"default": 1.1, "min": 0, "max": 2, "step": 0.05, "tooltip": "Sets how strongly to penalize repetitions. A higher value (e.g., 1.5) will penalize repetitions more strongly, while a lower value (e.g., 0.9) will be more lenient."}),
 
                 "enable_temperature": ("BOOLEAN", {"default": False}),
-                "temperature": ("FLOAT", {"default": 0.8, "min": 0, "max": 1, "step": 0.05}),
+                "temperature": ("FLOAT", {"default": 0.8, "min": -10, "max": 10, "step": 0.05, "tooltip": "Increasing the temperature will make the model answer more creatively."}),
 
                 "enable_seed": ("BOOLEAN", {"default": False}),
-                "seed": ("INT", {"default": seed, "min": 0, "max": 2 ** 31, "step": 1}),
+                "seed": ("INT", {"default": seed, "min": 0, "max": 2 ** 31, "step": 1, "tooltip": "Sets the random number seed to use for generation. Setting this to a specific number will make the model generate the same text for the same prompt."}),
 
                 "enable_stop": ("BOOLEAN", {"default": False}),
-                "stop": ("STRING", {"default": "", "multiline": False, }),
+                "stop": ("STRING", {"default": "", "multiline": False, "tooltip": "When this pattern is encountered the LLM will stop generating text and return."}),
 
                 "enable_tfs_z": ("BOOLEAN", {"default": False}),
                 "tfs_z": ("FLOAT", {"default": 1, "min": 1, "max": 1000, "step": 0.05}),
 
                 "enable_num_predict": ("BOOLEAN", {"default": False}),
-                "num_predict": ("INT", {"default": -1, "min": -2, "max": 2048, "step": 1}),
+                "num_predict": ("INT", {"default": -1, "min": -2, "max": 2048, "step": 1, "tooltip": "Maximum number of tokens to predict when generating text. The default -1 means infinite generation."}),
 
                 "enable_top_k": ("BOOLEAN", {"default": False}),
-                "top_k": ("INT", {"default": 40, "min": 0, "max": 100, "step": 1}),
+                "top_k": ("INT", {"default": 40, "min": 0, "max": 100, "step": 1, "tooltip": "Reduces the probability of generating nonsense. A higher value (e.g. 100) will give more diverse answers, while a lower value (e.g. 10) will be more conservative."}),
 
                 "enable_top_p": ("BOOLEAN", {"default": False}),
-                "top_p": ("FLOAT", {"default": 0.9, "min": 0, "max": 1, "step": 0.05}),
+                "top_p": ("FLOAT", {"default": 0.9, "min": 0, "max": 1, "step": 0.05, "tooltip": "Works together with top-k. A higher value (e.g., 0.95) will lead to more diverse text, while a lower value (e.g., 0.5) will generate more focused and conservative text."}),
 
                 "enable_min_p": ("BOOLEAN", {"default": False}),
-                "min_p": ("FLOAT", {"default": 0.0, "min": 0, "max": 1, "step": 0.05}),
+                "min_p": ("FLOAT", {"default": 0.0, "min": 0, "max": 1, "step": 0.05, "tooltip": "Alternative to the top_p, and aims to ensure a balance of quality and variety. The parameter p represents the minimum probability for a token to be considered, relative to the probability of the most likely token. For example, with p=0.05 and the most likely token having a probability of 0.9, logits with a value less than 0.045 are filtered out."}),
 
-                # this is for nodes code usage only, not ollama api.
-                "debug": ("BOOLEAN", {"default": False}),
+                "debug": ("BOOLEAN", {"default": False, "tooltip": "For debugging purposes of the custom nodes, no effect on ollama api."}),
             },
         }
 
@@ -528,6 +524,7 @@ class OllamaOptionsV2:
     RETURN_NAMES = ("options",)
     FUNCTION = "ollama_options"
     CATEGORY = "Ollama"
+    DESCRIPTION = "Various settings for advanced configuration of Ollama inference. See Ollama documentation for more details."
 
     def ollama_options(self, **kargs):
 
@@ -549,10 +546,11 @@ class OllamaConnectivityV2:
             "required": {
                 "url": ("STRING", {
                     "multiline": False,
-                    "default": "http://127.0.0.1:11434"
+                    "default": "http://127.0.0.1:11434",
+                    "tooltip": "The URL of the Ollama server. Default value points to a local instance with ollama's default port configuration."
                 }),
-                "model": ((), {}),
-                "keep_alive": ("INT", {"default": 5, "min": -1, "max": 120, "step": 1}),
+                "model": ((), {"tooltip": "Select a model for inference. This is a list of available models on the Ollama server. If you don't see any, make sure the Ollama server is running on the url and there are models installed."}),
+                "keep_alive": ("INT", {"default": 5, "min": -1, "max": 120, "step": 1, "tooltip": "Configures how long ollama keeps the model loaded in memory after inference. -1 = keep alive indefinitely, 0 = unload model immediately after inference"}),
                 "keep_alive_unit": (["minutes", "hours"],),
             },
         }
@@ -561,6 +559,7 @@ class OllamaConnectivityV2:
     RETURN_NAMES = ("connection",)
     FUNCTION = "ollama_connectivity"
     CATEGORY = "Ollama"
+    DESCRIPTION = "Provides connection to an Ollama server. Use the refresh button to load the model list in case of connection error or after installing a new model."
 
     def ollama_connectivity(self, url, model, keep_alive, keep_alive_unit):
         data = {
@@ -583,29 +582,33 @@ class OllamaGenerateV2:
             "required": {
                 "system": ("STRING", {
                     "multiline": True,
-                    "default": "You are an AI artist."
+                    "default": "You are an AI artist.",
+                    "tooltip": "System prompt - use this to set the role and general behavior of the model."
                 }),
                 "prompt": ("STRING", {
                     "multiline": True,
-                    "default": "What is art?"
+                    "default": "What is art?",
+                    "tooltip": "User prompt - a question or task you want the model to answer or perform. For vision tasks, you can refer to the input image as 'this image', 'photo' etc. like 'Describe this image in detail'"
                 }),
-                "keep_context": ("BOOLEAN", {"default": False}),
-                "format": (["text", "json"],),
+                "think": ("BOOLEAN", {"default": False, "tooltip": "If enabled, the model will do a thinking process before answering. This can result in more accurate results. The thinking is then available as a separate output for debugging or understanding how the model arrived at its answer. Some models don't support this feature and the generation will fail."}),
+                "keep_context": ("BOOLEAN", {"default": False, "tooltip": "If enabled, the model will keep the context of the conversation and use it for the next generation. This is useful for multi-turn conversations or tasks that require context."}),
+                "format": (["text", "json"], {"tooltip": "Output format of the response. 'text' will return a plain text response, while 'json' will return a structured response in JSON format. This is useful when the model is part of a larger pipeline and you need additional processing on the response. In this case I recommend showing the model example outputs in the system prompt. Some models are not trained to perform well in structured output."}),
 
             },
             "optional": {
-                "connectivity": ("OLLAMA_CONNECTIVITY", {"forceInput": False},),
-                "options": ("OLLAMA_OPTIONS", {"forceInput": False},),
-                "images": ("IMAGE", {"forceInput": False},),
-                "context": ("OLLAMA_CONTEXT", {"forceInput": False},),
-                "meta": ("OLLAMA_META", {"forceInput": False},),
+                "connectivity": ("OLLAMA_CONNECTIVITY", {"forceInput": False, "tooltip": "Set an ollama provider for the generation. If this input is empty, the 'meta' input must be set."},),
+                "options": ("OLLAMA_OPTIONS", {"forceInput": False, "tooltip": "Connect an Ollama Options node for advanced inference configuration."},),
+                "images": ("IMAGE", {"forceInput": False, "tooltip": "Provide an image or a batch of images for vision tasks. Make sure that the selected model supports vision, otherwise it may hallucinate the response."},),
+                "context": ("OLLAMA_CONTEXT", {"forceInput": False, "tooltip": "Optionally set an existing model context, useful for multi-turn conversations, follow-up questions."},),
+                "meta": ("OLLAMA_META", {"forceInput": False, "tooltip": "Use this input to chain multiple 'Ollama Generate' nodes. In this case the connectivity and options inputs are passed along."},),
             }
         }
 
-    RETURN_TYPES = ("STRING", "OLLAMA_CONTEXT", "OLLAMA_META",)
-    RETURN_NAMES = ("result", "context", "meta",)
+    RETURN_TYPES = ("STRING", "STRING", "OLLAMA_CONTEXT", "OLLAMA_META",)
+    RETURN_NAMES = ("result", "thinking", "context", "meta",)
     FUNCTION = "ollama_generate_v2"
     CATEGORY = "Ollama"
+    DESCRIPTION = "Text generation with Ollama. Supports vision tasks, multi-turn conversations, and advanced inference options. Connect an Ollama Connectivity node to set the server URL and model."
 
     def get_request_options(self, options):
         response = None
@@ -628,7 +631,7 @@ class OllamaGenerateV2:
 
         return response
 
-    def ollama_generate_v2(self, system, prompt, format, keep_context, context=None, options=None, connectivity=None, images=None, meta=None):
+    def ollama_generate_v2(self, system, prompt, think, keep_context, format, context = None, options=None, connectivity=None, images=None, meta=None):
 
         if connectivity is None and meta is None:
             raise Exception("Required input connectivity or meta.")
@@ -688,6 +691,7 @@ system: {system}
 prompt: {prompt}
 images: {0 if images_b64 is None else len(images_b64)}
 context: {context}
+think: {think}
 options: {request_options}
 keep alive: {request_keep_alive}
 format: {format}
@@ -700,6 +704,7 @@ format: {format}
             prompt=prompt,
             images=images_b64,
             context=context,
+            think=think,
             options=request_options,
             keep_alive=request_keep_alive,
             format=format,
@@ -710,12 +715,15 @@ format: {format}
             pprint(response)
             print("---------------------------------------------------------")
 
+        ollama_response_text = response['response']
+        ollama_response_thinking = response['thinking'] if think else None
+
         if keep_context:
             self.saved_context = response["context"]
             if debug_print:
                 print("saving context to node memory.")
 
-        return response['response'], response['context'], meta,
+        return ollama_response_text, ollama_response_thinking, response['context'], meta,
 
 
 NODE_CLASS_MAPPINGS = {
@@ -735,9 +743,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "OllamaGenerate": "Ollama Generate",
     "OllamaGenerateAdvance": "Ollama Generate Advance",
     "OllamaGenerateAdvanceIsChinese": "Ollama Generate Advance If Chinese",
-    "OllamaOptionsV2": "Ollama Options V2",
-    "OllamaConnectivityV2": "Ollama Connectivity V2",
-    "OllamaGenerateV2": "Ollama Generate V2",
+    "OllamaOptionsV2": "Ollama Options",
+    "OllamaConnectivityV2": "Ollama Connectivity",
+    "OllamaGenerateV2": "Ollama Generate",
     "OllamaSaveContext": "Ollama Save Context",
     "OllamaLoadContext": "Ollama Load Context",
 }
